@@ -40,6 +40,7 @@ class Detect(nn.Module):
             nn.Sequential(Conv(x, c2, 3), Conv(c2, c2, 3), nn.Conv2d(c2, 4 * self.reg_max, 1)) for x in ch
         )
         self.cv3 = nn.ModuleList(nn.Sequential(Conv(x, c3, 3), Conv(c3, c3, 3), nn.Conv2d(c3, self.nc, 1)) for x in ch)
+        self.atte = nn.ModuleList(simam_module(x, x) for x in ch)
         self.dfl = DFL(self.reg_max) if self.reg_max > 1 else nn.Identity()
 
     def inference(self, x):
@@ -73,7 +74,8 @@ class Detect(nn.Module):
     def forward_feat(self, x, cv2, cv3):
         y = []
         for i in range(self.nl):
-            y.append(torch.cat((cv2[i](x[i]), cv3[i](x[i])), 1))
+            #y.append(torch.cat((cv2[i](x[i]), cv3[i](x[i])), 1))
+            y.append(torch.cat((cv2[i](self.atte[i](x[i])), cv3[i](self.atte[i](x[i]))), 1))
         return y
 
     def forward(self, x):
@@ -100,6 +102,52 @@ class Detect(nn.Module):
             return dist2bbox(bboxes, anchors, xywh=False, dim=1)
         return dist2bbox(bboxes, anchors, xywh=True, dim=1)
 
+#######################
+class h_swish(nn.Module):
+    def __init__(self, inplace=True):
+        super(h_swish, self).__init__()
+        self.sigmoid = h_sigmoid(inplace=inplace)
+
+    def forward(self, x):
+        return x * self.sigmoid(x) 
+
+class h_sigmoid(nn.Module):
+    def __init__(self, inplace=True):
+        super(h_sigmoid, self).__init__()
+        self.relu = nn.ReLU6(inplace=inplace)
+
+    def forward(self, x):
+        return self.relu(x + 3) / 6
+#######################
+#######################
+####SIMAM#####
+class simam_module(nn.Module):
+    def __init__(self, channels = None, e_lambda = 1e-4):
+        super(simam_module, self).__init__()
+
+        self.activaton = h_swish()
+        self.e_lambda = e_lambda
+
+    def __repr__(self):
+        s = self.__class__.__name__ + '('
+        s += ('lambda=%f)' % self.e_lambda)
+        return s
+
+    @staticmethod
+    def get_module_name():
+        return "simam"
+
+    def forward(self, x):
+
+        b, c, h, w = x.size()
+        
+        n = w * h - 1
+
+        x_minus_mu_square = (x - x.mean(dim=[2,3], keepdim=True)).pow(2)
+        y = x_minus_mu_square / (4 * (x_minus_mu_square.sum(dim=[2,3], keepdim=True) / n + self.e_lambda)) + 0.5
+
+        return x * self.activaton(y)
+########################
 
 class Segment(Detect):
     """YOLOv8 Segment head for segmentation models."""
@@ -507,9 +555,12 @@ class v10Detect(Detect):
 
         self.one2one_cv2 = copy.deepcopy(self.cv2)
         self.one2one_cv3 = copy.deepcopy(self.cv3)
-    
+        #self.one2one_atte = copy.deepcopy(self.atte)
+        
+   
     def forward(self, x):
         one2one = self.forward_feat([xi.detach() for xi in x], self.one2one_cv2, self.one2one_cv3)
+        #one2one = self.forward_feat([(self.atte[i](xi)).detach() for xi in x], self.one2one_cv2, self.one2one_cv3)
         if not self.export:
             one2many = super().forward(x)
 
