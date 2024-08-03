@@ -1,0 +1,8 @@
+train: /content/gdrive/MyDrive/sintering_process/MechanicalParts_yolov8/train/images  # 128 images
+val: /content/gdrive/MyDrive/sintering_process/MechanicalParts_yolov8/test/images  # 128 images
+
+# train: /content/gdrive/MyDrive/CityScapes/City_scapes_v3/train/images
+# val: /content/gdrive/MyDrive/CityScapes/City_scapes_v3/val/images
+
+nc: 4
+names: ['Bearing', 'Bolt', 'Gear', 'Nut']
