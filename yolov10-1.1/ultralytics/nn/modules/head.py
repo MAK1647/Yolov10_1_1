@@ -118,6 +118,13 @@ class h_sigmoid(nn.Module):
 
     def forward(self, x):
         return self.relu(x + 3) / 6
+
+def channel_shuffle(x, groups=2):   ##shuffle channel 
+    #RESHAPE----->transpose------->Flatten 
+    B, C, H, W = x.size()
+    out = x.view(B, groups, C // groups, H, W).permute(0, 2, 1, 3, 4).contiguous()
+    out=out.view(B, C, H, W) 
+    return out
 #######################
 #######################
 ####SIMAM#####
@@ -145,6 +152,7 @@ class simam_module(nn.Module):
 
         x_minus_mu_square = (x - x.mean(dim=[2,3], keepdim=True)).pow(2)
         y = x_minus_mu_square / (4 * (x_minus_mu_square.sum(dim=[2,3], keepdim=True) / n + self.e_lambda)) + 0.5
+        y = channel_shuffle(y,16)
 
         return x * self.activaton(y)
 ########################
