@@ -1,0 +1,14 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\ultralytics",
+    "\\ultralytics\\cfg",
+    "\\ultralytics\\cfg\\models",
+    "\\ultralytics\\cfg\\models\\v10",
+    "\\ultralytics\\cfg\\trackers",
+    "\\ultralytics\\nn",
+    "\\ultralytics\\nn\\modules"
+  ],
+  "SelectedNode": "\\ultralytics\\nn\\modules\\head.py",
+  "PreviewInSolutionExplorer": false
+}
