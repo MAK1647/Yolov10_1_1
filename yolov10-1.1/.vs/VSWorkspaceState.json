@@ -5,10 +5,11 @@
     "\\ultralytics\\cfg",
     "\\ultralytics\\cfg\\models",
     "\\ultralytics\\cfg\\models\\v10",
+    "\\ultralytics\\cfg\\models\\v5",
     "\\ultralytics\\cfg\\trackers",
     "\\ultralytics\\nn",
     "\\ultralytics\\nn\\modules"
   ],
-  "SelectedNode": "\\ultralytics\\nn\\modules\\head.py",
+  "SelectedNode": "\\ultralytics\\cfg\\models\\v10\\yolov10s_SimAM.yaml",
   "PreviewInSolutionExplorer": false
 }
