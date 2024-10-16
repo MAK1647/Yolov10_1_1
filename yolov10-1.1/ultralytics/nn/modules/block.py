@@ -15,6 +15,7 @@ __all__ = (
     "HGStem",
     "SPP",
     "SPPF",
+    "SPPF_MSimAM",
     "C1",
     "C2",
     "C3",
