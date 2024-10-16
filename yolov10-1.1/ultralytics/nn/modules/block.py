@@ -41,7 +41,61 @@ __all__ = (
     "Silence",
 )
 
+#######################
+class h_swish(nn.Module):
+    def __init__(self, inplace=True):
+        super(h_swish, self).__init__()
+        self.sigmoid = h_sigmoid(inplace=inplace)
 
+    def forward(self, x):
+        return x * self.sigmoid(x) 
+
+class h_sigmoid(nn.Module):
+    def __init__(self, inplace=True):
+        super(h_sigmoid, self).__init__()
+        self.relu = nn.ReLU6(inplace=inplace)
+
+    def forward(self, x):
+        return self.relu(x + 3) / 6
+
+def channel_shuffle(x, groups=2):   ##shuffle channel 
+    #RESHAPE----->transpose------->Flatten 
+    B, C, H, W = x.size()
+    out = x.view(B, groups, C // groups, H, W).permute(0, 2, 1, 3, 4).contiguous()
+    out=out.view(B, C, H, W) 
+    return out
+#######################
+#######################
+####SIMAM#####
+class simam_module(nn.Module):
+    def __init__(self, channels = None, e_lambda = 1e-4):
+        super(simam_module, self).__init__()
+
+        self.activaton = h_swish()
+        self.e_lambda = e_lambda
+
+    def __repr__(self):
+        s = self.__class__.__name__ + '('
+        s += ('lambda=%f)' % self.e_lambda)
+        return s
+
+    @staticmethod
+    def get_module_name():
+        return "simam"
+
+    def forward(self, x):
+
+        b, c, h, w = x.size()
+        
+        n = w * h - 1
+
+        x_minus_mu_square = (x - x.mean(dim=[2,3], keepdim=True)).pow(2)
+        y = x_minus_mu_square / (4 * (x_minus_mu_square.sum(dim=[2,3], keepdim=True) / n + self.e_lambda)) + 0.5
+        y = channel_shuffle(y,16)
+
+        return x * self.activaton(y)
+#######################
+#######################       
 class DFL(nn.Module):
     """
     Integral module of Distribution Focal Loss (DFL).
@@ -170,6 +224,7 @@ class SPPF(nn.Module):
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c_ * 4, c2, 1, 1)
         self.m = nn.MaxPool2d(kernel_size=k, stride=1, padding=k // 2)
+        
 
     def forward(self, x):
         """Forward pass through Ghost Convolution block."""
@@ -177,6 +232,30 @@ class SPPF(nn.Module):
         y1 = self.m(x)
         y2 = self.m(y1)
         return self.cv2(torch.cat((x, y1, y2, self.m(y2)), 1))
+        
+class SPPF_MSimAM(nn.Module):
+    """Spatial Pyramid Pooling - Fast (SPPF) layer for YOLOv5 by Glenn Jocher."""
+
+    def __init__(self, c1, c2, k=5):
+        """
+        Initializes the SPPF layer with given input/output channels and kernel size.
+
+        This module is equivalent to SPP(k=(5, 9, 13)).
+        """
+        super().__init__()
+        c_ = c1 // 2  # hidden channels
+        self.cv1 = Conv(c1, c_, 1, 1)
+        self.cv2 = Conv(c_ * 4, c2, 1, 1)
+        self.m = nn.MaxPool2d(kernel_size=k, stride=1, padding=k // 2)
+        self.atte = simam_module(c2) 
+        
+
+    def forward(self, x):
+        """Forward pass through Ghost Convolution block."""
+        x = self.cv1(x)
+        y1 = self.m(x)
+        y2 = self.m(y1)
+        return seld.atte(self.cv2(torch.cat((x, y1, y2, self.m(y2)), 1)))
 
 
 class C1(nn.Module):
@@ -239,61 +318,7 @@ class C2f(nn.Module):
         y.extend(m(y[-1]) for m in self.m)
         return self.cv2(torch.cat(y, 1))
 
-#######################
-class h_swish(nn.Module):
-    def __init__(self, inplace=True):
-        super(h_swish, self).__init__()
-        self.sigmoid = h_sigmoid(inplace=inplace)
-
-    def forward(self, x):
-        return x * self.sigmoid(x) 
-
-class h_sigmoid(nn.Module):
-    def __init__(self, inplace=True):
-        super(h_sigmoid, self).__init__()
-        self.relu = nn.ReLU6(inplace=inplace)
-
-    def forward(self, x):
-        return self.relu(x + 3) / 6
-
-def channel_shuffle(x, groups=2):   ##shuffle channel 
-    #RESHAPE----->transpose------->Flatten 
-    B, C, H, W = x.size()
-    out = x.view(B, groups, C // groups, H, W).permute(0, 2, 1, 3, 4).contiguous()
-    out=out.view(B, C, H, W) 
-    return out
-#######################
-#######################
-####SIMAM#####
-class simam_module(nn.Module):
-    def __init__(self, channels = None, e_lambda = 1e-4):
-        super(simam_module, self).__init__()
-
-        self.activaton = h_swish()
-        self.e_lambda = e_lambda
-
-    def __repr__(self):
-        s = self.__class__.__name__ + '('
-        s += ('lambda=%f)' % self.e_lambda)
-        return s
-
-    @staticmethod
-    def get_module_name():
-        return "simam"
-
-    def forward(self, x):
-
-        b, c, h, w = x.size()
-        
-        n = w * h - 1
-
-        x_minus_mu_square = (x - x.mean(dim=[2,3], keepdim=True)).pow(2)
-        y = x_minus_mu_square / (4 * (x_minus_mu_square.sum(dim=[2,3], keepdim=True) / n + self.e_lambda)) + 0.5
-        y = channel_shuffle(y,16)
-
-        return x * self.activaton(y)
-#######################
-#######################        
+ 
 class C2fSimAM(nn.Module):
     """Faster Implementation of CSP Bottleneck with 2 convolutions."""
 
